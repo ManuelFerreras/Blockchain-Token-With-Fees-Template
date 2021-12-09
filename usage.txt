@@ -1,0 +1,6 @@
+Token Name = Line 526
+Token Symbol = Line 527
+Token Supply = Line 528
+Token Decimals = Line 530
+
+Other config in token constructor.
