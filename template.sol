@@ -743,11 +743,19 @@ contract templateToken is IERC20, Ownable {
     mapping (address => bool) private _isExcluded;
     address[] private _excluded;
 
-    uint256 addressFee;
-    uint256 burnFee;
-    uint256 liquidityFee;
+    uint256 public addressFee;
+    uint256 public burnFee;
+    uint256 public liquidityFee;
 
-    address addressWallet;
+    address public addressWallet;
+    address public liquidityWallet;
+
+    IUniswapV2Router02 public uniswapV2Router;
+    address public immutable uniswapV2Pair;
+
+    mapping (address => bool) public automatedMarketMakerPairs;
+
+
 
 
     // Events
@@ -765,6 +773,7 @@ contract templateToken is IERC20, Ownable {
 
         addressFee = _addressFee;
         burnFee = _burnFee;
+        liquidityFee = _liquidityFee;
 
         // IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x39B3AA2693C12dA383ABa6A6e404f1383a914f0e); // Testnet
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E); // Mainnet
@@ -781,18 +790,16 @@ contract templateToken is IERC20, Ownable {
     }
 
     function setUniswapV2Router(address newAddress) public onlyOwner {
-        require(newAddress != address(uniswapV2Router), "The People Token: The router already has that address");
-        emit UniswapV2RouterChange(newAddress, address(uniswapV2Router));
+        require(newAddress != address(uniswapV2Router), "The router already has that address");
         uniswapV2Router = IUniswapV2Router02(newAddress);
     }
 
     function _setAutomatedMarketMakerPair(address pair, bool value) private {
-        require(automatedMarketMakerPairs[pair] != value, "The People Token: Automated market maker pair is already set to that value");
+        require(automatedMarketMakerPairs[pair] != value, "Automated market maker pair is already set to that value");
         automatedMarketMakerPairs[pair] = value;
         if(value) {
-            dividendTracker.excludeFromDividends(pair);
+            excludeAccount(pair);
         }
-        emit AutomatedMarketMakerPairChange(pair, value);
     }
 
     function changeburnFee(uint256 _newFee) public onlyOwner {
@@ -989,7 +996,8 @@ contract templateToken is IERC20, Ownable {
         _burn(address(this), bFee);
 
         _tOwned[addressWallet] += mFee;
-        _tOwned[liquidityWallet] += lFee;
+
+        _swapAndLiquify(lFee);
 
         _tOwned[recipient] = _tOwned[recipient].add(tAmount);
         emit Transfer(sender, recipient, tAmount);
